@@ -15,10 +15,10 @@
   with_filetree: "{{ kubernetes_resources_directory }}"
   when: item.state == 'file' and item.path.endswith('.j2')
   
-#- include_tasks: tasks/configure_azm_ms_agent.yml
-#  when: configure_azm_ms_agent
+- include_tasks: tasks/configure_azm_ms_agent.yml
+  when: configure_azm_ms_agent
   
-#- include_tasks: tasks/configure_monitoring_newrelic.yml
+- include_tasks: tasks/configure_monitoring_newrelic.yml
 
 #- name: Delete compiled templates
 #  file:
