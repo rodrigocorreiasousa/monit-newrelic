@@ -1,0 +1,2 @@
+---
+kubernetes_resources_directory: "{{ role_path }}/templates"

@@ -1,0 +1,11 @@
+- name: Applying the New Relic monitoring stack
+  shell: "kubectl apply -f {{ kubernetes_resources_directory }}/nri-monitoring/{{item}}"
+  environment:
+    KUBECONFIG: '{{ kubeconfig_path }}'
+  loop:
+  - nri-namespace.yaml
+  - nri-kube-state-metrics.yaml
+  - nri-kube-events.yaml
+  - nri-prometheus.yaml
+  - nri-infraestructure.yaml
+  - nri-logging.yaml

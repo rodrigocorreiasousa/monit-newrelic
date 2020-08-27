@@ -1,0 +1,4 @@
+- name: Configuring the Azure logger. 
+  shell: "kubectl apply -f {{ kubernetes_resources_directory }}/azure-monitoring/azm-ms-agent.yaml"
+  environment:
+    KUBECONFIG: '{{ kubeconfig_path }}'

@@ -1,0 +1,128 @@
+---
+# Source: nri-bundle/charts/nri-prometheus/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nri-prometheus
+  namespace: {{ namespace_newrelic }}
+
+---
+# Source: nri-bundle/charts/nri-prometheus/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nri-prometheus
+rules:
+- apiGroups: [""]
+  resources:
+    - "nodes"
+    - "nodes/metrics"
+    - "nodes/stats"
+    - "nodes/proxy"
+    - "pods"
+    - "services"
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+
+---
+# Source: nri-bundle/charts/nri-prometheus/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nri-prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nri-prometheus
+subjects:
+- kind: ServiceAccount
+  name: nri-prometheus
+  namespace: {{ namespace_newrelic }}
+
+---
+# Source: nri-bundle/charts/nri-prometheus/templates/configmap.yaml
+kind: ConfigMap
+metadata:
+  name: nri-prometheus-cfg
+  namespace: {{ namespace_newrelic }}
+  labels:
+    app: nri-prometheus
+apiVersion: v1
+data:
+  config.yaml: |
+    cluster_name: {{ cluster_name }}
+    scrape_duration: "{{ nri_scrape_duration_prom }}"
+    scrape_timeout: "{{ nri_scrape_timeout_prom }}"
+    telemetry_emitter_delta_expiration_age: "{{ nri_telemetry_expiration_age_prom }}"
+    telemetry_emitter_delta_expiration_check_interval: "{{ nri_telemetry_expiration_interv_prom }}"
+    verbose: {{ nri_verbose_prom }}
+    insecure_skip_verify: {{ nri_insecure_skip_verify_prom }}
+    scrape_enabled_label: "{{ scrape_enabled_label_prom }}"
+    require_scrape_enabled_label_for_nodes: {{ require_scrape_enabled_label_prom }} 
+  {% if nri_rules_general_prom is not none and nri_rules_general_prom | length > 0 %}
+  {{ {'targets': nri_rules_general_prom} | to_nice_yaml(indent=4) }}
+  {% endif %}
+
+---
+# Source: nri-bundle/charts/nri-prometheus/templates/secret.yaml
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nri-prometheus-sct
+  namespace: {{ namespace_newrelic }}
+type: Opaque
+data:
+  licenseKey: {{ license_key | b64encode }}
+
+---
+# Source: nri-bundle/charts/nri-prometheus/templates/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nri-prometheus
+  namespace: {{ namespace_newrelic }}
+  labels:
+    app: nri-prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nri-prometheus
+  template:
+    metadata:
+      labels:
+        app: nri-prometheus
+    spec:
+      serviceAccountName: nri-prometheus
+      containers:
+      - name: nri-prometheus
+        image: {{ nri_registry_url }}/{{ nri_image_prom }}
+        args:
+          - "--configfile=/etc/nri-prometheus/config.yaml"
+        ports:
+          - containerPort: 8080
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/nri-prometheus/
+        env:
+          - name: "LICENSE_KEY"
+            valueFrom:
+                secretKeyRef:
+                  name: nri-prometheus-sct
+                  key: licenseKey
+          - name: "BEARER_TOKEN_FILE"
+            value: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+          - name: "CA_FILE"
+            value: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+      volumes:
+        - name: config-volume
+          configMap:
+            name: nri-prometheus-cfg

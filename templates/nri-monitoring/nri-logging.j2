@@ -1,0 +1,206 @@
+---
+# Source: nri-bundle/charts/newrelic-logging/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: {{ namespace_newrelic }}
+  name: nri-logging
+
+---
+# Source: nri-bundle/charts/newrelic-logging/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nri-logging
+rules:
+  - apiGroups: [""]
+    resources:
+      - namespaces
+      - pods
+    verbs: ["get", "list", "watch"]
+
+---
+# Source: nri-bundle/charts/newrelic-logging/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nri-logging
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nri-logging
+subjects:
+- kind: ServiceAccount
+  name: nri-logging
+  namespace: {{ namespace_newrelic }}
+
+---
+# Source: nri-bundle/charts/newrelic-logging/templates/secret.yaml
+
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: {{ namespace_newrelic }}
+  name: nri-logging-sct
+type: Opaque
+data:
+  license: {{ license_key | b64encode }}
+
+---
+# Source: nri-bundle/charts/newrelic-logging/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: {{ namespace_newrelic }}
+  name: nri-logging-cfg
+data:
+  # Configuration files: server, input, filters and output
+  # ======================================================
+  fluent-bit.conf: |
+{% for service in nri_service_fluent_bit_log %}
+    [SERVICE]
+    {% for key in service %}
+    {{ key }} {{ service[key] }}
+    {% endfor %}
+    {% endfor %}
+Parsers_File parsers.conf        
+
+    @INCLUDE input-kubernetes.conf
+    @INCLUDE output-newrelic.conf
+    @INCLUDE filter-kubernetes.conf
+
+  input-kubernetes.conf: |  
+{% for input in nri_input_kubernetes_log %}
+    [INPUT]
+    {% for key in input %}
+    {{ key }} {{ input[key] }}
+    {% endfor %}
+    {% endfor %}
+
+  filter-kubernetes.conf: |
+    [FILTER]
+        Name           record_modifier
+        Match          *
+        Record         cluster_name ${CLUSTER_NAME}
+    
+{% for filter in nri_filter_type_kubernetes_log %}
+    [FILTER]
+    {% for key in filter %}
+    {{ key }} {{ filter[key] }}
+    {% endfor %}
+    {% endfor %}
+
+{% if nri_filter1_log is not none and nri_filter1_log | length > 0 %}
+{% for filter in nri_filter1_log %}
+    [FILTER]
+    {% for key in filter %}
+    {{ key }} {{ filter[key] }}
+    {% endfor %}
+    {% endfor %}
+{% endif %}
+
+{% if nri_filter2_log is not none and nri_filter2_log | length > 0 %}
+{% for filter in nri_filter2_log %}
+    [FILTER]
+    {% for key in filter %}
+    {{ key }} {{ filter[key] }}
+    {% endfor %}
+    {% endfor %}
+{% endif %}
+
+  output-newrelic.conf: |
+    [OUTPUT]
+        Name  newrelic
+        Match *
+        licenseKey ${LICENSE_KEY}
+        endpoint ${ENDPOINT}
+  
+  parsers.conf: |
+    [PARSER]
+        Name   json
+        Format json
+        Time_Key time
+        Time_Format %d/%b/%Y:%H:%M:%S %z
+
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+        # Command      |  Decoder | Field | Optional Action
+        # =============|==================|=================
+        Decode_Field_As   escaped    log
+
+---
+# Source: nri-bundle/charts/newrelic-logging/templates/daemonset.yaml
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  namespace: {{ namespace_newrelic }}
+  name: nri-logging
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: nri-logging
+  template:
+    metadata:
+      labels:
+        app: nri-logging
+    spec:
+      serviceAccountName: nri-logging
+      hostNetwork: true # This option is a requirement for the Infrastructure Agent to report the proper hostname in New Relic.
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: nri-logging
+          image: "{{ nri_registry_url }}/{{ nri_image_log }}"
+          imagePullPolicy: "IfNotPresent"
+          env:
+            - name: ENDPOINT
+              value: "{{ nri_endpoint_newrelic_log }}"
+            - name: SOURCE
+              value: "kubernetes"
+            - name: LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nri-logging-sct
+                  key: license
+            - name: CLUSTER_NAME
+              value: "{{ cluster_name }}"
+          command:
+            - /fluent-bit/bin/fluent-bit
+            - -c
+            - /fluent-bit/etc/fluent-bit.conf
+            - -e
+            - /fluent-bit/bin/out_newrelic.so
+          volumeMounts:
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc
+            - name: var
+              mountPath: /var
+          resources:
+            limits:
+              cpu: {{ nri_limits_cpu_log }}
+              memory: {{ nri_limits_memory_log }}
+            requests:
+              cpu: {{ nri_requests_cpu_log }}
+              memory: {{ nri_requests_memory_log }}            
+      volumes:
+        - name: fluent-bit-config
+          configMap:
+            name: nri-logging-cfg
+        - name: var
+          hostPath:
+            path: /var
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists

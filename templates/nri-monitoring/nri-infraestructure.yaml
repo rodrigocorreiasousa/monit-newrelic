@@ -1,0 +1,174 @@
+---
+# Source: nri-bundle/charts/newrelic-infrastructure/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: nri-monitoring
+  name: nri-infrastructure
+automountServiceAccountToken: true
+
+---
+# Source: nri-bundle/charts/newrelic-infrastructure/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nri-infrastructure
+rules:
+  - apiGroups: [""]
+    resources:
+      - "nodes"
+      - "nodes/metrics"
+      - "nodes/stats"
+      - "nodes/proxy"
+      - "pods"
+      - "services"
+      - "secrets"
+    verbs: ["get", "list"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+
+---
+# Source: nri-bundle/charts/newrelic-infrastructure/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+   name: nri-infrastructure
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nri-infrastructure
+subjects:
+- kind: ServiceAccount
+  name: nri-infrastructure
+  namespace: nri-monitoring
+
+---
+# Source: nri-bundle/charts/newrelic-infrastructure/templates/secret.yaml
+
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: nri-monitoring
+  name: nri-infrastructure-sct
+type: Opaque
+data:
+  license: MWE3YmY3MTdmZTc3Njg5YjU4MGU4N2UzOThiMmY1NGI2NTAyYjZhZA==
+
+---
+# Source: nri-bundle/charts/newrelic-infrastructure/templates/configmap.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nri-infrastructure-default-cfg # integrations config provided by default
+  namespace: nri-monitoring
+data:
+  nri-kubernetes-config.yml: |
+    integration_name: com.newrelic.kubernetes
+    instances: 
+      - name: nri-kubernetes
+        command: metrics
+    
+---
+# Source: nri-bundle/charts/newrelic-infrastructure/templates/daemonset.yaml
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nri-infrastructure
+  namespace: nri-monitoring
+  labels:
+    app: nri-infrastructure
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      name: nri-infrastructure
+  template:
+    metadata:
+      labels:
+        name: nri-infrastructure
+      annotations:
+        # Needed for Kubernetes versions prior to 1.6.0, where tolerations were set via annotations.
+        scheduler.alpha.kubernetes.io/tolerations: |
+          [{"operator": "Exists", "effect": "NoSchedule"},{"operator": "Exists", "effect": "NoExecute"}]
+    spec:
+      serviceAccountName: nri-infrastructure
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: nri-infrastructure
+          image: "newrelic/infrastructure-k8s:1.22.0"
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            privileged: true
+          resources:
+            limits:
+              memory: 300M
+            requests:
+              cpu: 100m
+              memory: 150M 
+          env:
+            - name: NRIA_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nri-infrastructure-sct
+                  key: license
+            - name: "CLUSTER_NAME"
+              value: Main-DMZ-treasury-aks-stg-new
+            - name: "NRIA_VERBOSE"
+              value: "0"
+            #- name: KUBE_STATE_METRICS_POD_LABEL
+              #value: <YOUR_LABEL>
+            
+            - name: "NRIA_DISPLAY_NAME"
+              valueFrom:
+                fieldRef:
+                  apiVersion: "v1"
+                  fieldPath: "spec.nodeName"
+            - name: "NRK8S_NODE_NAME"
+              valueFrom:
+                fieldRef:
+                  apiVersion: "v1"
+                  fieldPath: "spec.nodeName"
+            - name: "NRIA_CUSTOM_ATTRIBUTES"
+              value: '{"clusterName":"$(CLUSTER_NAME)"}'
+            - name: "NRIA_PASSTHROUGH_ENVIRONMENT"
+              value: "KUBERNETES_SERVICE_HOST,KUBERNETES_SERVICE_PORT,CLUSTER_NAME,CADVISOR_PORT,NRK8S_NODE_NAME,KUBE_STATE_METRICS_URL,KUBE_STATE_METRICS_POD_LABEL,TIMEOUT,ETCD_TLS_SECRET_NAME,ETCD_TLS_SECRET_NAMESPACE,API_SERVER_SECURE_PORT,KUBE_STATE_METRICS_SCHEME,KUBE_STATE_METRICS_PORT,SCHEDULER_ENDPOINT_URL,ETCD_ENDPOINT_URL,CONTROLLER_MANAGER_ENDPOINT_URL,API_SERVER_ENDPOINT_URL,DISABLE_KUBE_STATE_METRICS"
+          volumeMounts:
+            - name: dev
+              mountPath: /dev
+            - name: log
+              mountPath: /var/log
+            - name: host-docker-socket
+              mountPath: /var/run/docker.sock
+            - name: host-volume
+              mountPath: /host
+              readOnly: true
+            - name: nri-infrastructure-default-cfg-vol
+              mountPath: /var/db/newrelic-infra/integrations.d/       
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: log
+          hostPath:
+            path: /var/log
+        - name: host-docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+        - name: host-volume
+          hostPath:
+            path: /
+        - name: nri-infrastructure-default-cfg-vol
+          configMap:
+            name: nri-infrastructure-default-cfg
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists

@@ -1,0 +1,5 @@
+galaxy_info:
+  author: "Rodrigo Correia de Sousa <rodrigo.sousa@stone.com.br>"
+  description: Configure the monitoring stack for k8s clusters using New Relic. 
+  company: Stone CO
+dependencies: []

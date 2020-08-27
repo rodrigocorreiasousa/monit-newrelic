@@ -1,0 +1,19 @@
+---
+- hosts: localhost
+  roles:
+    - name: ansible-k8s-newrelic
+      vars:
+        kubeconfig_path: "/home/rodrigo/.kube/config"
+        cluster_name: "Main-DMZ-treasury-aks-stg-new"
+        license_key: "1a7bf717fe77689b580e87e398b2f54b6502b6ad"
+        configure_azm_ms_agent: "true"
+        azure_log_stdout: "false"
+        azure_log_stderr: "false"
+        #Input for the logs of Kubernetes
+        nri_input_kubernetes_log:
+        - {"Name": "tail", "Tag": "kube.*", "Path": "/var/log/containers/*.log", "Parser": "docker", "DB": "/var/log/flb_kube.db", "Mem_Buf_Limit": "7MB", "Skip_Long_Lines": "On", "Refresh_Interval": "10"}
+        #Filters for the logs of Kubernetes
+        nri_filter_type_kubernetes_log:
+        - {"Name": "kubernetes", "Match": "kube.*", "Kube_URL": "https://kubernetes.default.svc.cluster.local:443", "Merge_Log": "Off"}
+        nri_filter1_log:
+        nri_filter2_log:

@@ -1,0 +1,28 @@
+---
+# tasks file for ansible-k8s-newrelic
+
+- name: Verify variables are ok
+  assert:
+    that: 
+         - kubeconfig_path is defined
+         - cluster_name is defined
+         - license_key is defined
+
+- name: Compile templates
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ kubernetes_resources_directory }}/{{ item.path | regex_replace('.j2$' , '.yaml') }}"
+  with_filetree: "{{ kubernetes_resources_directory }}"
+  when: item.state == 'file' and item.path.endswith('.j2')
+  
+#- include_tasks: tasks/configure_azm_ms_agent.yml
+#  when: configure_azm_ms_agent
+  
+#- include_tasks: tasks/configure_monitoring_newrelic.yml
+
+#- name: Delete compiled templates
+#  file:
+#    path: "{{ kubernetes_resources_directory }}/{{ item.path | regex_replace('.j2$' , '.yaml') }}"
+#    state: absent
+#  with_filetree: "{{ kubernetes_resources_directory }}"
+#  when: item.state == 'file' and item.path.endswith('.j2')
