@@ -6,7 +6,6 @@
   - nri-namespace.yaml
   - nri-kube-state-metrics.yaml
   - nri-kube-events.yaml
-  - nri-prometheus.yaml
   - nri-infraestructure.yaml
   - nri-logging.yaml
 
