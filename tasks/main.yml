@@ -26,3 +26,8 @@
 #    state: absent
 #  with_filetree: "{{ kubernetes_resources_directory }}"
 #  when: item.state == 'file' and item.path.endswith('.j2')
+
+- name: visualiza seu arquivo
+  shell: "cat {{ kubernetes_resources_directory }}/nri-monitoring/nri-infraestructure.yaml"
+  register: result
+- debug: msg="{{ result.stdout_lines }}"
