@@ -71,7 +71,7 @@ data:
     instances: 
       - name: nri-kubernetes
         command: metrics
-    
+        
 ---
 # Source: nri-bundle/charts/newrelic-infrastructure/templates/daemonset.yaml
 

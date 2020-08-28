@@ -16,7 +16,7 @@ nri_integration_infra:
 - {"#- name:": "KUBE_STATE_METRICS_POD_LABEL", "  #value:": "<YOUR_LABEL>"}
 #infrastructure configuration parameters
 nri_config_infra:
-- {"integration_name:": "com.newrelic.kubernetes", "instances:": "", "  - name:": "nri-kubernetes", "    command:": "metrics"}
+- {"command:": "metrics"}
 #parameters of loglevel
 nri_nria_verbose_infra: "0"
 #limits e requests

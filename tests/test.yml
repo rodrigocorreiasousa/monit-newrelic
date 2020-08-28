@@ -1,7 +1,7 @@
 ---
 - hosts: localhost
   roles:
-    - name: ansible-k8s-newrelic
+    - name: monit-newrelic
       vars:
         kubeconfig_path: "/home/rodrigo/.kube/config"
         cluster_name: "Main-DMZ-treasury-aks-stg-new"

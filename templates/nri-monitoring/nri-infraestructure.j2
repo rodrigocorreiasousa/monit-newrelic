@@ -67,12 +67,15 @@ metadata:
   namespace: {{ namespace_newrelic }}
 data:
   nri-kubernetes-config.yml: |
+    integration_name: com.newrelic.kubernetes
+    instances: 
+      - name: nri-kubernetes
 {% if nri_config_infra is not none and nri_config_infra | length > 0 %}
 {% for config_infra in nri_config_infra %}
-  {% for key in config_infra %}
-  {{ key }} {{ config_infra[key] }}
-  {% endfor %}
-  {% endfor %}
+    {% for key in config_infra %}
+    {{ key }} {{ config_infra[key] }}
+    {% endfor %}
+    {% endfor %}
 {% endif %}
 
 ---
