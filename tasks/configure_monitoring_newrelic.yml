@@ -6,10 +6,6 @@
   - nri-namespace.yaml
   - nri-kube-state-metrics.yaml
   - nri-kube-events.yaml
+  - nri-prometheus.yaml
   - nri-infraestructure.yaml
   - nri-logging.yaml
-
-- name: visualiza seu arquivo
-  shell: "cat {{ kubernetes_resources_directory }}/nri-monitoring/nri-infraestructure.yaml"
-  register: result
-- debug: msg="{{ result.stdout_lines }}"
